@@ -484,6 +484,7 @@ async function pull(pend=[]){
   const ids=new Set(data.map(r=>r.id));
   if(!S.ro&&S.config&&S.config.exemplo){if(!ids.has('cartoes')&&!pend.includes('cartoes')){S.cart=exemploCart();pend=[...pend,'cartoes']}
     if(!ids.has('contas')&&!pend.includes('contas')){S.contas=exemploContas();pend=[...pend,'contas']}}
+  if(!S.ro&&migrarJuros()){['config','lancamentos','cartoes'].forEach(k=>{if(!pend.includes(k))pend=[...pend,k]})}
   const first=!S.loaded;S.loaded=true;initMes();
   if(pend.length&&!S.ro){pend.forEach(k=>dirty.add(k));flush()}else{cacheLocal();setSync('ok',S.ro?'Atualizado':'Salvo')}
   first?render():softRender();
@@ -955,12 +956,30 @@ document.addEventListener('toggle',e=>{const t=e.target;if(t.classList&&t.classL
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.target.id==='nc-nome'||e.target.id==='nc-orc'||e.target.id==='ns-nome')){e.preventDefault();document.querySelector(`[data-act="${e.target.id==='ns-nome'?'criar-sub':'criar-cat'}"]`)?.click()}});
 let toastT;function toast(t){let el=document.getElementById('toast');if(!el){el=document.createElement('div');el.id='toast';el.setAttribute('role','status');document.body.appendChild(el)}el.textContent=t;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>el.hidden=true,3000)}
 /* ---------- importar extrato ---------- */
+const SUBS_BANCO=['Juros do cheque especial','IOF','Tarifas bancárias'];
 const CATS_AUTO={
-  'Juros e tarifas bancárias':{tipo:'despesa',grupo:'Financeiro',orcado:0,consumo:true,subs:[{nome:'Juros do cheque especial',orcado:0},{nome:'IOF',orcado:0},{nome:'Tarifas bancárias',orcado:0}]},
+  'Impostos e taxas':{tipo:'despesa',grupo:'Essencial',orcado:0,subs:[]},
   'Transferências e Pix':{tipo:'despesa',grupo:'Estilo de vida',orcado:0,subs:[]}};
 function garantirCategoria(nome,sub){let c=cats().find(x=>x.nome===nome);
   if(!c){const base=CATS_AUTO[nome]||{tipo:'despesa',grupo:'Estilo de vida',orcado:0,subs:[]};c={nome,...JSON.parse(JSON.stringify(base))};cats().push(c)}
-  if(sub&&!(c.subs||[]).some(x=>x.nome===sub)){c.subs=c.subs||[];c.subs.push({nome:sub,orcado:0})}return c}
+  if(sub&&!(c.subs||[]).some(x=>x.nome===sub)){
+    // 1ª subcategoria: o orçado e os lançamentos que já existiam vão para "Outros …", para nada se perder
+    if(!hasSubs(c)&&(+c.orcado>0||S.lanc.some(l=>l.cat===c.nome&&!l.sub))){const outro='Outros '+c.nome.charAt(0).toLowerCase()+c.nome.slice(1);
+      c.subs=[{nome:outro,orcado:+c.orcado||0}];S.lanc.forEach(l=>{if(l.cat===c.nome&&!l.sub)l.sub=outro});S.cart.compras.forEach(cp=>{if(cp.cat===c.nome&&!cp.sub)cp.sub=outro})}
+    c.subs=c.subs||[];c.subs.push({nome:sub,orcado:0})}return c}
+/* migração: juros, IOF e tarifas passam a ser subcategorias de Impostos e taxas */
+function migrarJuros(){
+  if(!S.config||(S.config.migr&&S.config.migr.jurosImpostos))return false;
+  const alvo=l=>{const n=Extrato.norm(l.desc||'');
+    if(/juros.*(saldo|limite|cheque|especial|utiliz)|juros (cheque|limite|conta)/.test(n))return 'Juros do cheque especial';
+    if(/\biof\b/.test(n))return 'IOF';
+    if(l.cat==='Juros e tarifas bancárias')return SUBS_BANCO.includes(l.sub)?l.sub:'Tarifas bancárias';
+    return null};
+  let n=0;
+  for(const l of S.lanc){const sub=alvo(l);if(!sub)continue;if(l.cat==='Impostos e taxas'&&l.sub===sub)continue;garantirCategoria('Impostos e taxas',sub);l.cat='Impostos e taxas';l.sub=sub;n++}
+  const rg=S.config.regras||{};Object.keys(rg).forEach(k=>{const kn=k.replace(/^pix:/,'');const sub=alvo({desc:kn,cat:rg[k].cat,sub:rg[k].sub});if(sub)rg[k]={cat:'Impostos e taxas',sub}});
+  const i=cats().findIndex(c=>c.nome==='Juros e tarifas bancárias');if(i>=0&&!S.lanc.some(l=>l.cat==='Juros e tarifas bancárias')&&!S.contas.itens.some(c=>c.cat==='Juros e tarifas bancárias'))cats().splice(i,1);
+  S.config.migr={...(S.config.migr||{}),jurosImpostos:true};return true}
 function carregarScript(src,global){if(global&&window[global])return Promise.resolve();return new Promise((ok,err)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>err(new Error(src));document.head.appendChild(s)})}
 async function lerExtrato(file){
   S.impBusy=true;S.impErro=null;render();
@@ -1022,7 +1041,7 @@ function vImport(){
    <div class="imphead"><div><h3>${esc(I.arquivo)}</h3><p class="hint">${M.agencia?'Agência '+esc(M.agencia)+' · ':''}${M.conta?'Conta '+esc(M.conta)+' · ':''}${M.inicio?fmtData(M.inicio)+' a ':''}${M.fim?fmtData(M.fim)+'/'+M.fim.slice(0,4):''} · ${rows.length} movimentos</p></div>
     <div class="impstats"><span>Entradas <b class="up">${R(ent)}</b></span><span>Saídas <b class="down">${R(sai)}</b></span>${M.saldoFinal!=null?`<span>Saldo final <b class="${M.saldoFinal<0?'down':''}">${R(M.saldoFinal)}</b></span>`:''}
      ${confere===true?'<span class="chip ok" title="Saldo inicial + movimentos = saldo final">conferido</span>':confere===false?'<span class="chip atencao" title="A soma dos movimentos não bate com o saldo final do extrato">soma não confere</span>':''}</div></div>
-   ${M.saldoFinal!=null&&M.saldoFinal<0?`<p class="avisoneg"><b>Conta no cheque especial.</b> O saldo final é ${R(M.saldoFinal)}. Ao importar, esse saldo vai para o painel do cheque especial em Orçamento e entra como dívida em Patrimônio. Os juros e o IOF já estão separados em “Juros e tarifas bancárias”.</p>`:''}
+   ${M.saldoFinal!=null&&M.saldoFinal<0?`<p class="avisoneg"><b>Conta no cheque especial.</b> O saldo final é ${R(M.saldoFinal)}. Ao importar, esse saldo vai para o painel do cheque especial em Orçamento e entra como dívida em Patrimônio. Os juros e o IOF vão para Impostos e taxas, nas subcategorias “Juros do cheque especial” e “IOF”.</p>`:''}
    <p class="hint">Confira a categoria de cada linha. Saídas viram despesa e entradas viram receita automaticamente. Quando você troca a categoria de um item, as linhas iguais acompanham, e o app lembra da sua escolha nos próximos extratos.${nRev?` <b>${nRev} ${nRev===1?'linha precisa':'linhas precisam'} de revisão.</b>`:''}</p>
    <div class="tablewrap"><table class="imptab"><thead><tr><th></th><th>Data</th><th>Descrição</th><th class="n">Valor</th><th>Tipo</th><th>Categoria</th><th>Classificação</th></tr></thead><tbody>${linhas}</tbody></table></div>
    <div class="acts"><button class="btn primary" data-act="imp-confirmar">Importar ${inc.length} ${inc.length===1?'lançamento':'lançamentos'}</button>
@@ -1034,13 +1053,13 @@ document.addEventListener('dragleave',e=>{const z=e.target.closest&&e.target.clo
 document.addEventListener('drop',e=>{const z=e.target.closest&&e.target.closest('#dropzone');if(z){e.preventDefault();const f=e.dataTransfer&&e.dataTransfer.files[0];if(f)lerExtrato(f)}});
 
 /* ---------- cheque especial ---------- */
-function chequeInfo(m){const b=S.config&&S.config.banco,a=agg(m),n='Juros e tarifas bancárias';
-  return {b,neg:!!(b&&b.saldo<0),juros:a.porCat[n]||0,jurosCheque:a.porSub[n+'›Juros do cheque especial']||0,iof:a.porSub[n+'›IOF']||0}}
+function chequeInfo(m){const b=S.config&&S.config.banco,a=agg(m),n='Impostos e taxas',sv=x=>a.porSub[n+'›'+x]||0;
+  return {b,neg:!!(b&&b.saldo<0),juros:SUBS_BANCO.reduce((s,x)=>s+sv(x),0),jurosCheque:sv('Juros do cheque especial'),iof:sv('IOF')}}
 function vCheque(){
   const m=S.mes,ci=chequeInfo(m),b=ci.b;if(!b||(!ci.neg&&!ci.juros))return '';
   const dev=ci.neg?-b.saldo:0,lim=+b.limite||0,u=lim?dev/lim:0,taxa=dev&&ci.jurosCheque?ci.jurosCheque/dev:NaN,N=Math.max(1,Math.round(+S.config.chequeMeses||6));
   return `<section class="panel cheque ${ci.neg?'neg':''}"><div class="chhead"><h2>Cheque especial</h2>${ci.neg?'<span class="chip critico">conta negativa</span>':'<span class="chip ok">conta positiva</span>'}</div>
-   <p class="sub">Saldo da conta corrente${b.conta?' '+esc(b.conta):''}, atualizado pelo último extrato importado. Dá para corrigir à mão aqui. Os juros e o IOF entram como despesa em <b>Juros e tarifas bancárias</b> e reduzem a taxa de poupança, e o saldo negativo aparece como dívida em Patrimônio e no Painel.</p>
+   <p class="sub">Saldo da conta corrente${b.conta?' '+esc(b.conta):''}, atualizado pelo último extrato importado. Dá para corrigir à mão aqui. Os juros e o IOF entram como despesa em <b>Impostos e taxas › Juros do cheque especial</b> e <b>› IOF</b> e reduzem a taxa de poupança, e o saldo negativo aparece como dívida em Patrimônio e no Painel.</p>
    <div class="chgrid">
     <div><span class="l">Saldo em ${fmtData(b.data)}</span><input class="num big ${ci.neg?'down':''}" id="bk-saldo" data-k="bk" data-f="saldo" data-num inputmode="decimal" value="${num2.format(+b.saldo||0)}" aria-label="Saldo da conta"></div>
     <div><span class="l">Limite do cheque especial</span><input class="num" id="bk-limite" data-k="bk" data-f="limite" data-num inputmode="decimal" value="${lim?num2.format(lim):''}" placeholder="Informe o limite" aria-label="Limite do cheque especial">

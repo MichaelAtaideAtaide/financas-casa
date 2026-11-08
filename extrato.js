@@ -116,9 +116,9 @@
   /* ---------- classificação ---------- */
   // [padrão, categoria, subcategoria]; a primeira que casar vence
   const REGRAS = [
-    [/juros.*(saldo|limite|cheque|especial|utiliz)|juros (cheque|limite|conta)|encargos.*(limite|cheque)/, 'Juros e tarifas bancárias', 'Juros do cheque especial'],
-    [/\biof\b/, 'Juros e tarifas bancárias', 'IOF'],
-    [/tarifa|cesta (de )?servico|pacote de servico|anuidade|manutencao (de )?conta|taxa (de )?(saque|manutencao)/, 'Juros e tarifas bancárias', 'Tarifas bancárias'],
+    [/juros.*(saldo|limite|cheque|especial|utiliz)|juros (cheque|limite|conta)|encargos.*(limite|cheque)/, 'Impostos e taxas', 'Juros do cheque especial'],
+    [/\biof\b/, 'Impostos e taxas', 'IOF'],
+    [/tarifa|cesta (de )?servico|pacote de servico|anuidade|manutencao (de )?conta|taxa (de )?(saque|manutencao)/, 'Impostos e taxas', 'Tarifas bancárias'],
     [/sao paulo transporte|sptrans|bilhete unico|\bmetro\b|cptm|\buber\b|\b99 ?(app|pop|taxi)?\b|cabify|posto|combust|shell|ipiranga|petrobras|\bbr mania|estac|estacionamento|\bpark\b|zona azul|sem parar|conectcar|veloe|pedagio/, 'Transporte', ''],
     [/carrefour|pao de acucar|\bextra\b|assai|atacadao|\bdia (supermercado|brasil)|supermerc|mercado(?! ?(livre|pago))|hortifruti|\boba\b|sonda|st marche|emporio|bio mundo|quitanda|acougue|sacolao|natural da terra|minuto pa|swift/, 'Mercado', ''],
     [/restaurante|lanchon|lanchonete|picanharia|churrasc|pizza|burger|hamburg|mc ?donald|bk |subway|ifood|rappi|ze delivery|gelato|sorvet|\bcafe\b|coffee|padaria|panificadora|confeitaria|doceria|bistro|baoba|sushi|temaki|bar e|boteco|outback|madero|starbucks|cafeteria|coupcafe/, 'Restaurantes e delivery', ''],
