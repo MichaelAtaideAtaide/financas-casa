@@ -202,6 +202,35 @@ tr.pago td{color:var(--muted)}
 .nextf div{border:1px solid var(--line);border-radius:8px;padding:8px 10px;display:grid;gap:0;font-size:.8rem}
 .nextf div span{color:var(--muted);text-transform:capitalize}.nextf div.cur{border-color:var(--accent);background:var(--accent-soft)}
 .diaw{display:inline-flex;align-items:center;gap:4px}
+.drop{grid-column:1/-1;display:grid;gap:6px;justify-items:center;text-align:center;padding:28px 16px;border:2px dashed var(--accent);border-radius:10px;background:var(--surface);cursor:pointer;text-transform:none;letter-spacing:0;font-weight:400;font-size:.9rem;color:var(--fg)}
+.drop.over{background:var(--accent-soft)}
+.drop input[type=file]{font-size:.85rem;max-width:100%}
+.drop b{font-family:var(--display);font-weight:500;font-size:1.05rem}
+.erro{grid-column:1/-1;margin:0;color:var(--neg);font-weight:500}
+.impbox{display:grid;gap:12px;border:1px solid var(--accent);border-radius:10px;padding:16px;margin-bottom:14px;background:color-mix(in srgb,var(--accent-soft) 35%,var(--surface))}
+.impbox h3{margin:0;font-family:var(--display);font-weight:500;font-size:1.05rem;word-break:break-all}
+.impbox p{margin:0}
+.imphead{display:flex;flex-wrap:wrap;gap:8px 20px;justify-content:space-between;align-items:start}
+.impstats{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;font-size:.86rem;color:var(--muted)}
+.impstats b{color:var(--fg)}
+.avisoneg{background:var(--neg-soft);border:1px solid var(--neg);border-radius:8px;padding:10px 12px;font-size:.86rem}
+.imptab .orig{font-size:.72rem;color:var(--muted);padding-left:7px}
+.imptab tr.off td{opacity:.5}
+.imptab tr.rev td{background:color-mix(in srgb,var(--warn-soft) 60%,transparent)}
+.impbox .acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.impbox .acts .sp{flex:1}
+.cheque.neg{border-color:var(--neg)}
+.chhead{display:flex;align-items:center;gap:10px;margin-bottom:4px}.chhead h2{margin:0}
+.chgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.chgrid>div{border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:grid;gap:6px;align-content:start;min-width:0}
+.chgrid .l{font-size:.7rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600}
+.chgrid .big{font-family:var(--display);font-size:1.35rem;font-weight:500}
+.chgrid input{background:var(--surface2);border:1px solid transparent;border-radius:6px;padding:6px 8px;width:100%;min-width:0;color:var(--fg)}
+.chgrid input.big{font-size:1.25rem}
+.chgrid input:focus,.chplan input:focus{border-color:var(--accent);outline:none}
+.chplan{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:14px;padding:12px 14px;border-radius:10px;background:var(--surface2);font-size:.9rem}
+.chplan input{width:56px;text-align:center;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:4px;color:var(--fg)}
+.banner.alerta{background:var(--neg-soft);border-color:var(--neg)}
 body.ro [data-act^="pagar"],body.ro [data-act^="desfazer"],body.ro [data-act^="criar"],body.ro [data-act="nova-compra"],
 body.ro [data-act^="add"],body.ro [data-act^="del"],body.ro [data-act^="form"],body.ro [data-act="criar-padrao"],body.ro [data-act="limpar"],body.ro details.imp{display:none!important}
 @media (max-width:560px){.who .em{display:none}}
@@ -248,6 +277,7 @@ body.ro [data-act^="add"],body.ro [data-act^="del"],body.ro [data-act^="form"],b
 <script src="vendor/chart.umd.js"></script>
 <script src="vendor/supabase.js"></script>
 <script src="config.js"></script>
+<script src="extrato.js"></script>
 <script>
 (function(){
 const LS_KEY='financas-casa-v1';
@@ -297,12 +327,12 @@ function agg(m){
   for(const l of S.lanc){ if(ym(l.data)!==m)continue; const c=catInfo(l.cat),v=+l.valor||0; a.n++;
     a.porCat[c.nome]=(a.porCat[c.nome]||0)+v;
     if(l.sub){const k=c.nome+'›'+l.sub;a.porSub[k]=(a.porSub[k]||0)+v}
-    if(c.tipo==='receita')a.rec+=v; else {a.desp+=v; a.grupo[c.grupo]=(a.grupo[c.grupo]||0)+v; if(c.grupo!=='Financeiro')a.cons+=v;} }
+    if(c.tipo==='receita')a.rec+=v; else {a.desp+=v; a.grupo[c.grupo]=(a.grupo[c.grupo]||0)+v; if(c.grupo!=='Financeiro'||c.consumo)a.cons+=v;} }
   a.cart=0;
   for(const p of parcelasDoMes(m)){const c=catInfo(p.cp.cat),v=p.valor;a.n++;a.cart+=v;
     a.porCat[c.nome]=(a.porCat[c.nome]||0)+v;
     if(p.cp.sub){const k=c.nome+'›'+p.cp.sub;a.porSub[k]=(a.porSub[k]||0)+v}
-    a.desp+=v;a.grupo[c.grupo]=(a.grupo[c.grupo]||0)+v;if(c.grupo!=='Financeiro')a.cons+=v}
+    a.desp+=v;a.grupo[c.grupo]=(a.grupo[c.grupo]||0)+v;if(c.grupo!=='Financeiro'||c.consumo)a.cons+=v}
   a.sobra=a.rec-a.desp; a.poup=a.rec?(a.rec-a.cons)/a.rec:NaN; return a;
 }
 /* ---------- cartões e contas: cálculos ---------- */
@@ -349,11 +379,13 @@ function exemploContas(){const m=ym(hoje());const r=(id,desc,cat,valor,dia)=>({i
    {id:'ct7',desc:'IPTU (parcela)',cat:'Impostos e taxas',sub:'',valor:310,tipo:'unica',data:m+'-20'}],pagamentos:{}}}
 function mesesComDados(){return [...new Set(S.lanc.map(l=>ym(l.data)).filter(Boolean))].sort()}
 function ultimosMeses(n,ate){const r=[];for(let i=n-1;i>=0;i--)r.push(addM(ate,-i));return r}
-function patrTot(){let at=0,ps=0,liq=0,parc=0;for(const p of S.patr){const v=+p.valor||0;if(p.tipo==='passivo'){ps+=v;parc+=+p.parcela||0}else{at+=v;if(p.liquidez==='Alta')liq+=v}}return{at,ps,pl:at-ps,liq,parc}}
+function patrTot(){let at=0,ps=0,liq=0,parc=0;for(const p of S.patr){const v=+p.valor||0;if(p.tipo==='passivo'){ps+=v;parc+=+p.parcela||0}else{at+=v;if(p.liquidez==='Alta')liq+=v}}
+  const bk=S.config&&S.config.banco,cheque=bk&&bk.saldo<0?-bk.saldo:0;ps+=cheque;return{at,ps,pl:at-ps,liq,parc,cheque}}
 
 /* ---------- análise automática ---------- */
 function analise(){
   const out=[],m=S.mes,a=agg(m),ant=agg(addM(m,-1));
+  const ci=chequeInfo(m);if(ci.neg)out.push({n:'critico',t:'Conta corrente no cheque especial: '+R(ci.b.saldo),p:`${ci.juros?`Foram ${R(ci.juros)} de juros e IOF em ${labMesLongo(m)}. `:''}Priorize zerar esse saldo antes de investir: os juros do cheque especial estão entre os mais caros do mercado.`});
   if(!a.n){out.push({n:'atencao',t:'Sem lançamentos em '+labMesLongo(m),p:'Registre receitas e despesas deste mês para a análise ficar completa.'});return out}
   if(!a.rec) out.push({n:'critico',t:'Nenhuma receita registrada no mês',p:'Sem receitas, não dá para calcular poupança nem a regra 50/30/20.'});
   else{
@@ -489,7 +521,7 @@ function vPainel(){
   const e=a.rec?a.grupo.Essencial/a.rec:0,l=a.rec?a.grupo['Estilo de vida']/a.rec:0,f=a.rec?Math.max(0,(a.rec-a.cons))/a.rec:0;
   const ruleRow=(nome,v,alvo,cor,inv)=>{const ok=inv?v>=alvo:v<=alvo;return `<div class="row"><span>${nome}</span><div class="track"><div class="fill" style="width:${Math.min(100,v*100)}%;background:${ok?'var(--accent)':'var(--neg)'}"></div><div class="mark" style="left:${alvo*100}%" title="Referência ${alvo*100}%"></div></div><b class="${ok?'up':'down'}" style="text-align:right">${P(v)}</b></div>`};
   const fs=analise();
-  return `<section class="kpis">
+  return `${alertaCheque()}<section class="kpis">
     <div class="kpi"><span class="l">Receitas</span><span class="v">${R(a.rec)}</span>${delta(a.rec,ant.rec)}</div>
     <div class="kpi"><span class="l">Despesas totais</span><span class="v">${R(a.desp)}</span>${delta(a.desp,ant.desp,true)}</div>
     <div class="kpi"><span class="l">Sobra em caixa</span><span class="v ${a.sobra<0?'down':''}">${R(a.sobra)}</span><span class="d">receitas − despesas totais</span></div>
@@ -541,10 +573,11 @@ function vLanc(){
   rows=rows.slice().sort((a,b)=>(b.data||'').localeCompare(a.data||''));
   let rec=0,desp=0;rows.forEach(l=>{catInfo(l.cat).tipo==='receita'?rec+=+l.valor||0:desp+=+l.valor||0});
   return `<section class="panel"><h2>Lançamentos</h2><p class="sub">Cada linha é uma entrada ou saída de dinheiro. A categoria define se é receita ou despesa. As alterações são salvas sozinhas.</p>
-  <div class="toolbar"><button class="btn primary" data-act="add-lanc">+ Novo lançamento</button>
+  <div class="toolbar"><button class="btn primary" data-act="add-lanc">+ Novo lançamento</button><button class="btn ${S.form==='extrato'?'sel':''}" data-act="form-open" data-f="extrato">Importar extrato</button>
    <input type="search" id="fq" placeholder="Buscar descrição" value="${esc(S.q)}" aria-label="Buscar">
    <select id="fcat" aria-label="Filtrar categoria"><option value="">Todas as categorias</option>${cats().map(c=>`<option ${c.nome===S.fcat?'selected':''}>${esc(c.nome)}</option>`).join('')}</select>
    <label class="hint"><input type="checkbox" id="ftodos" ${S.todos?'checked':''}> todos os meses</label></div>
+  ${vImport()}
   <div class="tablewrap"><table><thead><tr><th style="width:140px">Data</th><th>Descrição</th><th style="width:200px">Categoria</th><th class="n" style="width:130px">Valor (R$)</th><th style="width:60px">Pago</th><th style="width:40px"></th></tr></thead><tbody>
   ${rows.map(l=>{const t=catInfo(l.cat).tipo;return `<tr><td><input type="date" id="l-${l.id}-data" data-k="l" data-id="${l.id}" data-f="data" value="${esc(l.data)}"></td>
    <td><input id="l-${l.id}-desc" data-k="l" data-id="${l.id}" data-f="desc" value="${esc(l.desc)}" placeholder="Descrição"></td>
@@ -711,7 +744,7 @@ function vOrc(){
     return h}).join('');
     return `${grpRow(titulo,8,lista.length)}${fechado(titulo)?'':rows}<tr class="tot"><td colspan="2"><b>Total ${titulo.toLowerCase()}</b></td><td class="n"><b>${R(to)}</b></td><td class="n"><b>${R(tr)}</b></td><td class="n"><b>${R(rec?tr-to:to-tr)}</b></td><td colspan="3"></td></tr>`};
   const tO=cats().filter(c=>c.tipo==='despesa').reduce((s,c)=>s+orc(c),0),rO=cats().filter(c=>c.tipo==='receita').reduce((s,c)=>s+orc(c),0);
-  return `<section class="panel dre"><h2>Orçamento × realizado</h2><p class="sub">Aqui você cria, edita e exclui categorias e subcategorias. Clique no nome para renomear, use <b>+ sub</b> numa linha para abrir uma subcategoria e <b>×</b> para excluir. Quando a categoria tem subcategorias, o orçado dela é a soma delas. O realizado vem dos lançamentos de ${labMesLongo(S.mes)}. Diferença positiva é folga; negativa é estouro (nas receitas, o contrário).</p>
+  return `${vCheque()}<section class="panel dre"><h2>Orçamento × realizado</h2><p class="sub">Aqui você cria, edita e exclui categorias e subcategorias. Clique no nome para renomear, use <b>+ sub</b> numa linha para abrir uma subcategoria e <b>×</b> para excluir. Quando a categoria tem subcategorias, o orçado dela é a soma delas. O realizado vem dos lançamentos de ${labMesLongo(S.mes)}. Diferença positiva é folga; negativa é estouro (nas receitas, o contrário).</p>
   <div class="toolbar"><button class="btn primary ${S.form==='cat'?'sel':''}" data-act="form-cat" aria-expanded="${S.form==='cat'}">+ Categoria</button><button class="btn ${S.form==='sub'?'sel':''}" data-act="form-sub" aria-expanded="${S.form==='sub'}">+ Subcategoria</button>${togAll()}<span class="sp"></span><span class="hint">Receita prevista ${R(rO)} · Despesas orçadas ${R(tO)} · Sobra planejada <b class="${rO-tO<0?'down':'up'}">${R(rO-tO)}</b></span></div>
   ${formCat()}<div class="tablewrap"><table><thead><tr><th>Categoria</th><th>Grupo</th><th class="n">Orçado</th><th class="n">Realizado</th><th class="n">Diferença</th><th>Uso</th><th class="n">%</th><th></th></tr></thead><tbody>
   ${sec('Receitas',cats().filter(c=>c.tipo==='receita'),true)}${GRUPOS.map(g=>sec(g,cats().filter(c=>c.tipo==='despesa'&&c.grupo===g),false)).join('')}
@@ -759,7 +792,7 @@ function vPatr(){
    <section class="panel"><h2>Bens e investimentos</h2><p class="sub">Saldos atuais. Liquidez alta (resgate em até 1 dia) entra na conta da reserva de emergência.</p>
     <div class="toolbar"><button class="btn" data-act="add-patr" data-tipo="ativo">+ Adicionar bem</button></div>${tab('ativo')}</section>
    <section class="panel"><h2>Dívidas</h2><p class="sub">Saldo devedor de cada dívida e o valor da parcela mensal.</p>
-    <div class="toolbar"><button class="btn" data-act="add-patr" data-tipo="passivo">+ Adicionar dívida</button></div>${tab('passivo')}</section>
+    <div class="toolbar"><button class="btn" data-act="add-patr" data-tipo="passivo">+ Adicionar dívida</button></div>${tab('passivo')}${pt.cheque?`<p class="hint" style="margin-top:10px">Inclui <b class="down">${R(pt.cheque)}</b> de cheque especial (saldo negativo da conta em ${fmtData(S.config.banco.data)}), atualizado pelo extrato. Ajuste em Orçamento › Cheque especial.</p>`:''}</section>
   </div>
   <section class="panel"><h2>Composição dos bens</h2><p class="sub">Distribuição do patrimônio bruto por tipo</p><div class="chartbox sm"><canvas id="chPatr" role="img" aria-label="Composição dos bens"></canvas></div></section>`;
 }
@@ -844,7 +877,14 @@ document.addEventListener('click',e=>{
     if(tipo==='fatura'){delete S.cart.pagas[id+'|'+m];mark('cartoes');render();return}
     const k=id+'|'+m,lid=S.contas.pagamentos[k];S.lanc=S.lanc.filter(l=>l.id!==lid);delete S.contas.pagamentos[k];mark('contas','lancamentos');render();toast('Pagamento desfeito e lançamento removido.');return}
   if(act==='exportar'){exportarExcel(b);return}
-  if(act==='form-fechar'){S.form=null;S.draft={};render();return}
+  if(act==='imp-novo'){S.imp=null;S.impErro=null;render();return}
+  if(act==='imp-todos'){const on=b.dataset.on==='1';S.imp.rows.forEach(r=>{if(!r.dup&&r.cat)r.incluir=on});render();return}
+  if(act==='imp-confirmar'){importarExtrato();return}
+  if(act==='ir-orc'){S.tab='orc';render();window.scrollTo({top:0});return}
+  if(act==='meta-cheque'){const bk=S.config.banco;if(!bk||bk.saldo>=0)return;const N=Math.max(1,Math.round(+S.config.chequeMeses||6));
+    const ex=S.metas.find(x=>x.nome==='Sair do cheque especial');if(ex){ex.alvo=-bk.saldo;ex.prazo=addM(S.mes,N)}else S.metas.push({id:uid(),nome:'Sair do cheque especial',alvo:-bk.saldo,atual:0,prazo:addM(S.mes,N)});
+    mark('metas');render();toast(`Meta “Sair do cheque especial” ${ex?'atualizada':'criada'} em Metas.`);return}
+  if(act==='form-fechar'){S.form=null;S.draft={};S.imp=null;S.impErro=null;render();return}
   if(act==='criar-cat'){const nome=document.getElementById('nc-nome').value.trim(),g=document.getElementById('nc-grupo').value,o=parseNum(document.getElementById('nc-orc').value),msg=document.getElementById('formMsg');
     if(!nome){msg.textContent='Digite um nome para a categoria.';return}
     if(cats().some(c=>c.nome.toLowerCase()===nome.toLowerCase())){msg.textContent='Já existe uma categoria com esse nome.';return}
@@ -871,10 +911,18 @@ document.addEventListener('input',e=>{const t=e.target;
   if(t.id==='fq'){S.q=t.value;const pos=t.selectionStart;render();const n=document.getElementById('fq');n.focus();n.setSelectionRange(pos,pos)}});
 document.addEventListener('change',e=>{
   const t=e.target;
+  if(t.id==='ext-file'&&t.files&&t.files[0]){lerExtrato(t.files[0]);return}
   if(t.id==='fcat'){S.fcat=t.value;render();return}
   if(t.id==='ftodos'){S.todos=t.checked;render();return}
   const k=t.dataset.k,f=t.dataset.f;if(!k||!f)return;
   const v=t.type==='checkbox'?t.checked:t.dataset.num!==undefined?parseNum(t.value):t.value;
+  if(k==='imp'){const r=S.imp&&S.imp.rows[+t.dataset.i];if(!r)return;
+    if(f==='incluir')r.incluir=v;else if(f==='desc')r.desc=v;
+    else if(f==='cat'){const[c,sb]=String(v).split(SEP);r.cat=c;r.sub=sb||'';r.conf=c?'manual':'revisar';r.motivo='Escolhida por você';r.ignorar=false;r.incluir=!!c&&!r.dup;
+      let n=0;S.imp.rows.forEach(o=>{if(o!==r&&o.chave===r.chave&&o.conf!=='manual'&&!o.dup){o.cat=r.cat;o.sub=r.sub;o.conf='manual';o.motivo='Igual a outra linha que você classificou';o.incluir=!!c;n++}});
+      if(n)toast(`Mesma categoria aplicada a mais ${n} ${n===1?'linha igual':'linhas iguais'}.`)}
+    setTimeout(()=>render(),0);return}
+  if(k==='bk'){S.config.banco=S.config.banco||{saldo:0,data:hoje(),limite:0};S.config.banco[f]=v;if(f==='saldo')S.config.banco.data=hoje();mark('config');setTimeout(()=>render(),0);return}
   if(k==='l'){const l=S.lanc.find(x=>x.id===t.dataset.id);if(l){if(f==='cat'){const[c,s]=String(v).split(SEP);l.cat=c;l.sub=s||''}else l[f]=v;mark('lancamentos')}}
   else if(k==='s'){const c=cats()[+t.dataset.i],s=c&&c.subs&&c.subs[+t.dataset.j];if(!s)return;
     if(f==='nome'){const nv=String(v).trim();if(!nv||c.subs.some(x=>x!==s&&x.nome===nv)){t.value=s.nome;return}
@@ -906,6 +954,106 @@ document.addEventListener('toggle',e=>{const t=e.target;if(t.classList&&t.classL
   if(t.dataset&&t.dataset.cid){if(t.open)S.compOpen=t.dataset.cid;else if(S.compOpen===t.dataset.cid)S.compOpen=null}},true);
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.target.id==='nc-nome'||e.target.id==='nc-orc'||e.target.id==='ns-nome')){e.preventDefault();document.querySelector(`[data-act="${e.target.id==='ns-nome'?'criar-sub':'criar-cat'}"]`)?.click()}});
 let toastT;function toast(t){let el=document.getElementById('toast');if(!el){el=document.createElement('div');el.id='toast';el.setAttribute('role','status');document.body.appendChild(el)}el.textContent=t;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>el.hidden=true,3000)}
+/* ---------- importar extrato ---------- */
+const CATS_AUTO={
+  'Juros e tarifas bancárias':{tipo:'despesa',grupo:'Financeiro',orcado:0,consumo:true,subs:[{nome:'Juros do cheque especial',orcado:0},{nome:'IOF',orcado:0},{nome:'Tarifas bancárias',orcado:0}]},
+  'Transferências e Pix':{tipo:'despesa',grupo:'Estilo de vida',orcado:0,subs:[]}};
+function garantirCategoria(nome,sub){let c=cats().find(x=>x.nome===nome);
+  if(!c){const base=CATS_AUTO[nome]||{tipo:'despesa',grupo:'Estilo de vida',orcado:0,subs:[]};c={nome,...JSON.parse(JSON.stringify(base))};cats().push(c)}
+  if(sub&&!(c.subs||[]).some(x=>x.nome===sub)){c.subs=c.subs||[];c.subs.push({nome:sub,orcado:0})}return c}
+function carregarScript(src,global){if(global&&window[global])return Promise.resolve();return new Promise((ok,err)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>err(new Error(src));document.head.appendChild(s)})}
+async function lerExtrato(file){
+  S.impBusy=true;S.impErro=null;render();
+  try{
+    if(/\.pdf$/i.test(file.name)||file.type==='application/pdf')await carregarScript('vendor/pdf.min.js','pdfjsLib');
+    const res=await Extrato.lerArquivo(file);
+    if(!res.txs.length)throw new Error('vazio');
+    const hist={};S.lanc.forEach(l=>{if(l.desc&&l.cat){const k=Extrato.norm(l.desc);hist[k]={cat:l.cat,sub:l.sub||''};hist['pix:'+k]=hist[k]}});
+    const ctx={cats:cats(),nome:res.meta.nome||'',regras:S.config.regras||{},historico:hist,criaveis:Object.keys(CATS_AUTO)};
+    const ja=new Set(S.lanc.map(l=>l.ext).filter(Boolean));
+    S.imp={meta:res.meta,arquivo:file.name,rows:res.txs.slice().sort((a,b)=>a.data.localeCompare(b.data)).map(tx=>{
+      const c=Extrato.classificar(tx,ctx),id=Extrato.idMov(tx),dup=ja.has(id);
+      return {tx,id,chave:Extrato.chave(tx),desc:Extrato.descricao(tx),cat:c.cat||'',sub:c.sub||'',conf:dup?'duplicado':c.conf,motivo:dup?'Este movimento já foi importado antes':c.motivo,ignorar:!!c.ignorar,dup,incluir:!dup&&!c.ignorar&&!!c.cat}})};
+  }catch(e){S.impErro=e&&e.message==='vazio'?'Não encontrei movimentos neste arquivo. Confira se é o extrato da conta corrente (PDF, OFX ou CSV).'
+    :(navigator.onLine?'Não consegui ler este arquivo. Tente o PDF baixado pelo app do banco ou exporte o extrato em OFX.':'Sem internet: abra o app online uma vez para habilitar a leitura de PDF.')}
+  S.impBusy=false;render();
+}
+function importarExtrato(){
+  const I=S.imp;if(!I)return;const sel=I.rows.filter(r=>r.incluir&&r.cat);
+  if(!sel.length){toast('Nenhuma linha marcada para importar.');return}
+  S.config.regras=S.config.regras||{};
+  for(const r of sel){garantirCategoria(r.cat,r.sub);const ci=catInfo(r.cat);
+    // despesa: saída vira valor positivo (entrada na mesma categoria vira estorno); receita: o contrário
+    const v=Math.round((ci.tipo==='despesa'?-r.tx.valor:r.tx.valor)*100)/100;
+    S.lanc.push({id:uid(),data:r.tx.data,desc:r.desc,cat:r.cat,sub:r.sub,valor:v,pago:true,ext:r.id});
+    S.config.regras[r.chave]={cat:r.cat,sub:r.sub}}
+  const m=I.meta;
+  if(m.saldoFinal!=null){const bk=S.config.banco||{};if(!bk.data||(m.fim||'')>=bk.data)S.config.banco={...bk,saldo:m.saldoFinal,data:m.fim||hoje(),conta:m.conta||bk.conta||'',agencia:m.agencia||bk.agencia||'',limite:+bk.limite||0}}
+  S.mes=ym(sel.map(r=>r.tx.data).sort().pop());S.imp=null;S.form=null;mark('config','lancamentos');render();
+  toast(`${sel.length} lançamentos importados${m.saldoFinal!=null&&m.saldoFinal<0?'. Saldo negativo enviado ao painel do cheque especial.':'.'}`);
+}
+function vImport(){
+  if(S.form!=='extrato')return '';
+  if(S.impBusy)return '<div class="newform"><h3>Lendo o extrato…</h3><p class="hint" style="grid-column:1/-1">Isso leva alguns segundos. A leitura acontece no seu aparelho.</p></div>';
+  if(!S.imp)return `<div class="newform"><h3>Importar extrato bancário</h3>
+    <label class="drop" id="dropzone" for="ext-file"><input type="file" id="ext-file" accept=".pdf,.ofx,.csv,.txt,application/pdf">
+     <b>Escolha o arquivo do extrato</b><span class="hint">PDF baixado do app do banco, OFX ou CSV. No computador, dá para arrastar o arquivo até aqui. O arquivo é lido no seu aparelho e não vai para nenhum servidor.</span></label>
+    ${S.impErro?`<p class="erro">${esc(S.impErro)}</p>`:''}
+    <div class="acts"><button class="btn ghost" data-act="form-fechar">Cancelar</button></div></div>`;
+  const I=S.imp,rows=I.rows,inc=rows.filter(r=>r.incluir&&r.cat);let ent=0,sai=0;inc.forEach(r=>{r.tx.valor>0?ent+=r.tx.valor:sai-=r.tx.valor});
+  const soma=rows.reduce((s,r)=>s+r.tx.valor,0),M=I.meta;
+  const confere=M.saldoInicial!=null&&M.saldoFinal!=null?Math.abs(M.saldoInicial+soma-M.saldoFinal)<0.02:null;
+  const nRev=inc.filter(r=>r.conf==='revisar').length;
+  const CC={aprendida:['ok','aprendida'],sugerida:['neutro','sugerida'],revisar:['atencao','revisar'],manual:['ok','sua escolha'],transferencia:['neutro','transferência'],duplicado:['neutro','já importado']};
+  const opts=r=>{const ex=cats().some(c=>c.nome===r.cat);let h=`<option value="" ${!r.cat?'selected':''}>— não importar —</option>`;
+    if(r.cat&&!ex)h+=`<option value="${esc(r.cat+(r.sub?SEP+r.sub:''))}" selected>${esc(r.cat)}${r.sub?' › '+esc(r.sub):''} (nova)</option>`;
+    return h+catOptions(ex?r.cat:'',ex?r.sub:'')};
+  const linhas=rows.map((r,i)=>{const cc=CC[r.conf]||CC.sugerida,neg=r.tx.valor<0;
+    const tipo=r.ignorar?['neutro','Transferência']:neg?['critico','Despesa']:['ok','Receita'];
+    return `<tr class="${r.incluir?'':'off'} ${r.conf==='revisar'&&r.incluir?'rev':''}">
+     <td><input type="checkbox" id="imp-${i}-inc" data-k="imp" data-i="${i}" data-f="incluir" ${r.incluir?'checked':''} ${r.dup?'disabled':''} aria-label="Importar esta linha" style="width:auto"></td>
+     <td>${fmtData(r.tx.data)}</td>
+     <td><input id="imp-${i}-desc" data-k="imp" data-i="${i}" data-f="desc" value="${esc(r.desc)}" style="min-width:170px"><div class="orig">${esc(r.tx.tipo)}</div></td>
+     <td class="n ${neg?'down':'up'}">${R(r.tx.valor)}</td>
+     <td><span class="chip ${tipo[0]}">${tipo[1]}</span></td>
+     <td><select id="imp-${i}-cat" data-k="imp" data-i="${i}" data-f="cat" ${r.dup?'disabled':''} aria-label="Categoria">${opts(r)}</select></td>
+     <td><span class="chip ${cc[0]}" title="${esc(r.motivo)}">${cc[1]}</span></td></tr>`}).join('');
+  return `<div class="impbox">
+   <div class="imphead"><div><h3>${esc(I.arquivo)}</h3><p class="hint">${M.agencia?'Agência '+esc(M.agencia)+' · ':''}${M.conta?'Conta '+esc(M.conta)+' · ':''}${M.inicio?fmtData(M.inicio)+' a ':''}${M.fim?fmtData(M.fim)+'/'+M.fim.slice(0,4):''} · ${rows.length} movimentos</p></div>
+    <div class="impstats"><span>Entradas <b class="up">${R(ent)}</b></span><span>Saídas <b class="down">${R(sai)}</b></span>${M.saldoFinal!=null?`<span>Saldo final <b class="${M.saldoFinal<0?'down':''}">${R(M.saldoFinal)}</b></span>`:''}
+     ${confere===true?'<span class="chip ok" title="Saldo inicial + movimentos = saldo final">conferido</span>':confere===false?'<span class="chip atencao" title="A soma dos movimentos não bate com o saldo final do extrato">soma não confere</span>':''}</div></div>
+   ${M.saldoFinal!=null&&M.saldoFinal<0?`<p class="avisoneg"><b>Conta no cheque especial.</b> O saldo final é ${R(M.saldoFinal)}. Ao importar, esse saldo vai para o painel do cheque especial em Orçamento e entra como dívida em Patrimônio. Os juros e o IOF já estão separados em “Juros e tarifas bancárias”.</p>`:''}
+   <p class="hint">Confira a categoria de cada linha. Saídas viram despesa e entradas viram receita automaticamente. Quando você troca a categoria de um item, as linhas iguais acompanham, e o app lembra da sua escolha nos próximos extratos.${nRev?` <b>${nRev} ${nRev===1?'linha precisa':'linhas precisam'} de revisão.</b>`:''}</p>
+   <div class="tablewrap"><table class="imptab"><thead><tr><th></th><th>Data</th><th>Descrição</th><th class="n">Valor</th><th>Tipo</th><th>Categoria</th><th>Classificação</th></tr></thead><tbody>${linhas}</tbody></table></div>
+   <div class="acts"><button class="btn primary" data-act="imp-confirmar">Importar ${inc.length} ${inc.length===1?'lançamento':'lançamentos'}</button>
+    <button class="btn ghost mini" data-act="imp-todos" data-on="1">Marcar todos</button><button class="btn ghost mini" data-act="imp-todos" data-on="0">Desmarcar todos</button>
+    <span class="sp"></span><button class="btn ghost" data-act="imp-novo">Outro arquivo</button><button class="btn ghost" data-act="form-fechar">Cancelar</button></div></div>`;
+}
+document.addEventListener('dragover',e=>{const z=e.target.closest&&e.target.closest('#dropzone');if(z){e.preventDefault();z.classList.add('over')}});
+document.addEventListener('dragleave',e=>{const z=e.target.closest&&e.target.closest('#dropzone');if(z)z.classList.remove('over')});
+document.addEventListener('drop',e=>{const z=e.target.closest&&e.target.closest('#dropzone');if(z){e.preventDefault();const f=e.dataTransfer&&e.dataTransfer.files[0];if(f)lerExtrato(f)}});
+
+/* ---------- cheque especial ---------- */
+function chequeInfo(m){const b=S.config&&S.config.banco,a=agg(m),n='Juros e tarifas bancárias';
+  return {b,neg:!!(b&&b.saldo<0),juros:a.porCat[n]||0,jurosCheque:a.porSub[n+'›Juros do cheque especial']||0,iof:a.porSub[n+'›IOF']||0}}
+function vCheque(){
+  const m=S.mes,ci=chequeInfo(m),b=ci.b;if(!b||(!ci.neg&&!ci.juros))return '';
+  const dev=ci.neg?-b.saldo:0,lim=+b.limite||0,u=lim?dev/lim:0,taxa=dev&&ci.jurosCheque?ci.jurosCheque/dev:NaN,N=Math.max(1,Math.round(+S.config.chequeMeses||6));
+  return `<section class="panel cheque ${ci.neg?'neg':''}"><div class="chhead"><h2>Cheque especial</h2>${ci.neg?'<span class="chip critico">conta negativa</span>':'<span class="chip ok">conta positiva</span>'}</div>
+   <p class="sub">Saldo da conta corrente${b.conta?' '+esc(b.conta):''}, atualizado pelo último extrato importado. Dá para corrigir à mão aqui. Os juros e o IOF entram como despesa em <b>Juros e tarifas bancárias</b> e reduzem a taxa de poupança, e o saldo negativo aparece como dívida em Patrimônio e no Painel.</p>
+   <div class="chgrid">
+    <div><span class="l">Saldo em ${fmtData(b.data)}</span><input class="num big ${ci.neg?'down':''}" id="bk-saldo" data-k="bk" data-f="saldo" data-num inputmode="decimal" value="${num2.format(+b.saldo||0)}" aria-label="Saldo da conta"></div>
+    <div><span class="l">Limite do cheque especial</span><input class="num" id="bk-limite" data-k="bk" data-f="limite" data-num inputmode="decimal" value="${lim?num2.format(lim):''}" placeholder="Informe o limite" aria-label="Limite do cheque especial">
+     ${lim?`<div class="bar ${u>.9?'over':u>.6?'near':''}"><span style="width:${Math.min(100,u*100)}%"></span></div><span class="hint">${P(u)} usado · ainda livre ${R(Math.max(0,lim-dev))}</span>`:'<span class="hint">para ver quanto do limite ainda resta</span>'}</div>
+    <div><span class="l">Juros e IOF em ${labMesLongo(m)}</span><b class="big down">${R(ci.juros)}</b><span class="hint">${isFinite(taxa)?`juros ≈ ${P(taxa)} ao mês sobre o saldo devedor (estimativa)`:'nenhum juro lançado neste mês'}</span></div>
+    <div><span class="l">Se nada mudar</span><b class="big">${R((ci.jurosCheque||ci.juros)*12)}</b><span class="hint">de juros em 12 meses, no ritmo deste mês</span></div>
+   </div>
+   ${ci.neg?`<div class="chplan"><span>Para zerar em</span><input id="cfg-chequeMeses" data-k="cfg" data-f="chequeMeses" data-num inputmode="numeric" value="${N}" aria-label="Meses para quitar"><span>meses, a conta precisa ficar <b>${R(dev/N)}</b> por mês no positivo, além dos juros que ainda vierem.</span><button class="btn mini" data-act="meta-cheque">${S.metas.some(x=>x.nome==='Sair do cheque especial')?'Atualizar meta de quitação':'Criar meta de quitação'}</button></div>`:''}
+  </section>`;
+}
+function alertaCheque(){const ci=chequeInfo(S.mes);if(!ci.neg)return '';
+  return `<section class="banner alerta"><p><b>Conta no cheque especial: ${R(ci.b.saldo)}</b> em ${fmtData(ci.b.data)}.${ci.juros?` Juros e IOF de ${labMesLongo(S.mes)}: <b>${R(ci.juros)}</b>.`:''} Zerar esse saldo é a prioridade número um.</p><button class="btn" data-act="ir-orc">Ver plano em Orçamento</button></section>`}
+
 /* ---------- exportar para Excel ---------- */
 function carregarXLSX(){if(window.XLSX)return Promise.resolve();return new Promise((ok,err)=>{const s=document.createElement('script');s.src='vendor/xlsx.full.min.js';s.onload=ok;s.onerror=()=>err(new Error('xlsx'));document.head.appendChild(s)})}
 async function exportarExcel(btn){
@@ -954,6 +1102,7 @@ async function exportarExcel(btn){
     // Patrimônio e metas
     const PT=[['Descrição','Tipo','Classe','Liquidez','Valor','Parcela mensal']];
     S.patr.forEach(p=>PT.push([p.nome,p.tipo==='passivo'?'Dívida':'Bem',p.classe,p.tipo==='passivo'?'':p.liquidez,+p.valor||0,p.tipo==='passivo'?(+p.parcela||0):'']));
+    {const ck=patrTot().cheque;if(ck)PT.push(['Cheque especial (saldo da conta)','Dívida','Cheque especial','',ck,''])}
     add('Patrimônio',PT,[28,10,24,10,14,14],[4,5]);
     const MT=[['Meta','Valor alvo','Já guardado','Falta','Prazo']];
     S.metas.forEach(m=>MT.push([m.nome,+m.alvo||0,+m.atual||0,Math.max(0,(+m.alvo||0)-(+m.atual||0)),m.prazo?labM(m.prazo):'']));
