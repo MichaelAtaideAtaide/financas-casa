@@ -215,6 +215,24 @@ tr.pago td{color:var(--muted)}
 .imphead{display:flex;flex-wrap:wrap;gap:8px 20px;justify-content:space-between;align-items:start}
 .impstats{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;font-size:.86rem;color:var(--muted)}
 .impstats b{color:var(--fg)}
+.plano{background:linear-gradient(135deg,var(--accent-soft),var(--surface) 70%);border:1px solid var(--accent);border-radius:14px;padding:18px 20px;display:grid;gap:14px}
+.plano.neg{background:linear-gradient(135deg,var(--neg-soft),var(--surface) 70%);border-color:var(--neg)}
+.pl-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px}.pl-head h2{margin:0;font-family:var(--display);font-weight:600;font-size:1.2rem}
+.pl-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.pl-tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:grid;gap:4px;align-content:start;min-width:0}
+.pl-l{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.pl-v{font-family:var(--display);font-weight:600;font-size:clamp(1.3rem,4.6vw,1.75rem);line-height:1.15;overflow-wrap:anywhere}
+.pl-v.big{font-size:clamp(1.5rem,5.6vw,2.2rem)}
+.pl-sub{font-size:.8rem;color:var(--muted)}
+.pl-real{font-size:.8rem;color:var(--muted)}.pl-real b{color:var(--fg)}
+.pl-bar{height:6px;border-radius:3px;background:var(--surface2);overflow:hidden;margin-top:4px}.pl-bar span{display:block;height:100%;border-radius:3px}
+.pl-main{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.pl-main .pl-l,.pl-main .pl-sub,.pl-main .pl-real,.pl-main .pl-real b{color:var(--surface);opacity:.92}
+.plano.neg .pl-main{background:var(--neg);border-color:var(--neg)}
+.pl-dist{display:flex;height:14px;border-radius:7px;overflow:hidden;background:var(--surface2);gap:2px}
+.pl-dist span{display:block;height:100%}
+.pl-leg{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:.8rem;color:var(--muted)}.pl-leg b{color:var(--fg)}
+.pl-leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
 .dupbox{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--surface)}.dupbox summary{cursor:pointer}
 .nadanovo{padding:18px;text-align:center;border:1px dashed var(--line);border-radius:8px;color:var(--muted)}
 .avisoneg{background:var(--neg-soft);border:1px solid var(--neg);border-radius:8px;padding:10px 12px;font-size:.86rem}
@@ -733,6 +751,24 @@ function estrutura(){
     return `<div class="gcol"><h4>${g==='Receita'?'Receitas':g}</h4><ul>${l.map(c=>{const i=cats().indexOf(c);return `<li><span class="cname">${esc(c.nome)}</span>${hasSubs(c)?`<div class="subs">${c.subs.map((s,j)=>`<span class="subchip">${esc(s.nome)}<button data-act="del-sub" data-i="${i}" data-j="${j}" aria-label="Excluir subcategoria ${esc(s.nome)}">×</button></span>`).join('')}</div>`:''}</li>`}).join('')}</ul></div>`}).join('');
   return `<details class="estr" ${S.estrOpen?'open':''}><summary>Categorias e subcategorias (${cats().length} categorias, ${cats().reduce((s,c)=>s+(c.subs||[]).length,0)} subcategorias)</summary><div class="gcols">${blocos}</div><p class="hint">Para renomear ou mudar o grupo de uma categoria, use a aba Orçamento.</p></details>`;
 }
+function resumoPlano(rO,tO,a){
+  const sobra=rO-tO,real=a.rec-a.desp,pc=v=>rO?v/rO:0,g={};GRUPOS.forEach(x=>g[x]=cats().filter(c=>c.tipo==='despesa'&&c.grupo===x).reduce((s,c)=>s+orc(c),0));
+  const seg=[['Essencial',g['Essencial'],'var(--c2)',.5],['Estilo de vida',g['Estilo de vida'],'var(--c3)',.3],['Financeiro',g['Financeiro'],'var(--c4)',null],[sobra>=0?'Sobra':'Déficit',Math.max(0,sobra),sobra>=0?'var(--accent)':'var(--neg)',null,sobra]];
+  const base=Math.max(rO,tO)||1,usoRec=rO?a.rec/rO:0,usoDesp=tO?a.desp/tO:0;
+  const realLine=(v,ref,inv)=>`<span class="pl-real">Realizado em ${MESES[+S.mes.slice(5,7)-1]}: <b>${R(v)}</b>${ref?` <span class="${inv?(v>ref?'down':'up'):(v<ref?'down':'up')}">(${P(v/ref)})</span>`:''}</span>`;
+  return `<section class="plano ${sobra<0?'neg':''}" aria-label="Resumo do plano do mês">
+   <div class="pl-head"><h2>Plano de ${labMesLongo(S.mes)}</h2><span class="hint">quanto você prevê ganhar, gastar e guardar</span></div>
+   <div class="pl-grid">
+    <div class="pl-tile"><span class="pl-l">Receita prevista</span><span class="pl-v">${R(rO)}</span>
+     <div class="pl-bar"><span style="width:${Math.min(100,usoRec*100)}%;background:var(--pos)"></span></div>${realLine(a.rec,rO,false)}</div>
+    <div class="pl-tile"><span class="pl-l">Despesas orçadas</span><span class="pl-v">${R(tO)}</span><span class="pl-sub">${rO?P(tO/rO)+' da receita prevista':''}</span>
+     <div class="pl-bar"><span style="width:${Math.min(100,usoDesp*100)}%;background:${usoDesp>1?'var(--neg)':usoDesp>.9?'var(--warn)':'var(--c3)'}"></span></div>${realLine(a.desp,tO,true)}</div>
+    <div class="pl-tile pl-main"><span class="pl-l">${sobra>=0?'Sobra planejada':'Déficit planejado'}</span><span class="pl-v big">${R(sobra)}</span><span class="pl-sub">${rO?(sobra>=0?`guardar ${P(sobra/rO)} da receita`:`faltam ${P(-sobra/rO)} da receita`):''}</span>
+     <span class="pl-real">Sobra real até agora: <b class="${real<0?'down':''}">${R(real)}</b></span></div>
+   </div>
+   <div class="pl-dist" role="img" aria-label="Divisão planejada da receita">${seg.filter(x=>x[1]>0).map(x=>`<span style="width:${x[1]/base*100}%;background:${x[2]}" title="${x[0]}: ${R(x[1])} (${P(pc(x[1]))})"></span>`).join('')}</div>
+   <div class="pl-leg">${seg.map(x=>`<span><i style="background:${x[2]}"></i>${x[0]} <b class="${x[4]<0?'down':''}">${P(pc(x[4]!=null?x[4]:x[1]))}</b>${x[3]!=null?` <span class="hint">(ref. até ${x[3]*100}%)</span>`:''}</span>`).join('')}</div>
+  </section>`}
 function vOrc(){
   const a=agg(S.mes);
   const line=(cls,nameCell,grpCell,orcCell,r,o,acts,rec)=>{const ratio=o?r/o:0,dif=rec?r-o:o-r;
@@ -752,8 +788,8 @@ function vOrc(){
     return h}).join('');
     return `${grpRow(titulo,8,lista.length)}${fechado(titulo)?'':rows}<tr class="tot"><td colspan="2"><b>Total ${titulo.toLowerCase()}</b></td><td class="n"><b>${R(to)}</b></td><td class="n"><b>${R(tr)}</b></td><td class="n"><b>${R(rec?tr-to:to-tr)}</b></td><td colspan="3"></td></tr>`};
   const tO=cats().filter(c=>c.tipo==='despesa').reduce((s,c)=>s+orc(c),0),rO=cats().filter(c=>c.tipo==='receita').reduce((s,c)=>s+orc(c),0);
-  return `${vCheque()}<section class="panel dre"><h2>Orçamento × realizado</h2><p class="sub">Aqui você cria, edita e exclui categorias e subcategorias. Clique no nome para renomear, use <b>+ sub</b> numa linha para abrir uma subcategoria e <b>×</b> para excluir. Quando a categoria tem subcategorias, o orçado dela é a soma delas. O realizado vem dos lançamentos de ${labMesLongo(S.mes)}. Diferença positiva é folga; negativa é estouro (nas receitas, o contrário).</p>
-  <div class="toolbar"><button class="btn primary ${S.form==='cat'?'sel':''}" data-act="form-cat" aria-expanded="${S.form==='cat'}">+ Categoria</button><button class="btn ${S.form==='sub'?'sel':''}" data-act="form-sub" aria-expanded="${S.form==='sub'}">+ Subcategoria</button>${togAll()}<span class="sp"></span><span class="hint">Receita prevista ${R(rO)} · Despesas orçadas ${R(tO)} · Sobra planejada <b class="${rO-tO<0?'down':'up'}">${R(rO-tO)}</b></span></div>
+  return `${resumoPlano(rO,tO,a)}${vCheque()}<section class="panel dre"><h2>Orçamento × realizado</h2><p class="sub">Aqui você cria, edita e exclui categorias e subcategorias. Clique no nome para renomear, use <b>+ sub</b> numa linha para abrir uma subcategoria e <b>×</b> para excluir. Quando a categoria tem subcategorias, o orçado dela é a soma delas. O realizado vem dos lançamentos de ${labMesLongo(S.mes)}. Diferença positiva é folga; negativa é estouro (nas receitas, o contrário).</p>
+  <div class="toolbar"><button class="btn primary ${S.form==='cat'?'sel':''}" data-act="form-cat" aria-expanded="${S.form==='cat'}">+ Categoria</button><button class="btn ${S.form==='sub'?'sel':''}" data-act="form-sub" aria-expanded="${S.form==='sub'}">+ Subcategoria</button>${togAll()}</div>
   ${formCat()}<div class="tablewrap"><table><thead><tr><th>Categoria</th><th>Grupo</th><th class="n">Orçado</th><th class="n">Realizado</th><th class="n">Diferença</th><th>Uso</th><th class="n">%</th><th></th></tr></thead><tbody>
   ${sec('Receitas',cats().filter(c=>c.tipo==='receita'),true)}${GRUPOS.map(g=>sec(g,cats().filter(c=>c.tipo==='despesa'&&c.grupo===g),false)).join('')}
   </tbody></table></div>
