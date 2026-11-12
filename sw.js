@@ -1,5 +1,5 @@
 // Finanças da Casa — service worker: funciona offline e pega atualizações quando há internet.
-const CACHE = 'financas-v9';
+const CACHE = 'financas-v10';
 const SHELL = ['./', 'index.html', 'config.js', 'manifest.webmanifest', 'vendor/chart.umd.js', 'vendor/supabase.js', 'extrato.js',
   'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'favicon.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });

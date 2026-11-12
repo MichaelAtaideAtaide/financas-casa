@@ -4,15 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Finanças da Casa</title>
-<meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#151D1A" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" id="themeColor" content="#151D1A">
+<script>/* aplica o tema antes de desenhar a página, para não piscar */(function(){var t='escuro';try{t=localStorage.getItem('financas-tema')||'escuro'}catch(e){}
+var h=document.documentElement;if(t==='escuro')h.setAttribute('data-theme','dark');else if(t==='claro')h.setAttribute('data-theme','light');
+var m=document.getElementById('themeColor'),d=t==='escuro'||(t==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);if(m)m.setAttribute('content',d?'#151D1A':'#FFFFFF')})();</script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Finanças">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-text-size-adjust:100%}img{max-width:100%}[hidden]{display:none!important}</style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&display=swap">
@@ -494,7 +496,7 @@ async function startSession(session,cache){
   if(!me&&!m){await SB.auth.signOut();showLogin('Este e-mail não tem acesso a esta planilha.');return}
   S.ro=!!m&&m.papel!=='editor';document.body.classList.toggle('ro',S.ro);
   const who=document.getElementById('who');who.hidden=false;
-  who.innerHTML=`<span class="em">${esc(email)}</span>${S.ro?'<span class="chip atencao">somente leitura</span>':''}<button class="btn mini" data-act="exportar" title="Baixar tudo em uma planilha do Excel">Exportar Excel</button><button class="btn ghost mini" data-act="sair">Sair</button>`;
+  who.innerHTML=`<span class="em">${esc(email)}</span>${S.ro?'<span class="chip atencao">somente leitura</span>':''}<button class="btn ghost mini" data-act="tema" id="btnTema" title="Trocar entre escuro, claro e automático">${rotuloTema()}</button><button class="btn mini" data-act="exportar" title="Baixar tudo em uma planilha do Excel">Exportar Excel</button><button class="btn ghost mini" data-act="sair">Sair</button>`;
   await pull((cache&&cache.pend)||[]);
   if(!started){started=true;subscribe()}
 }
@@ -507,6 +509,7 @@ async function pull(pend=[]){
   if(!S.ro&&S.config&&S.config.exemplo){if(!ids.has('cartoes')&&!pend.includes('cartoes')){S.cart=exemploCart();pend=[...pend,'cartoes']}
     if(!ids.has('contas')&&!pend.includes('contas')){S.contas=exemploContas();pend=[...pend,'contas']}}
   if(!S.ro&&migrarJuros()){['config','lancamentos','cartoes'].forEach(k=>{if(!pend.includes(k))pend=[...pend,k]})}
+  if(S.config&&S.config.tema&&S.config.tema!==temaAtual())aplicarTema(S.config.tema);
   const first=!S.loaded;S.loaded=true;initMes();
   if(pend.length&&!S.ro){pend.forEach(k=>dirty.add(k));flush()}else{cacheLocal();setSync('ok',S.ro?'Atualizado':'Salvo')}
   first?render():softRender();
@@ -925,6 +928,7 @@ document.addEventListener('click',e=>{
   if(act==='limpa-semsub'){S.fsemsub=false;render();return}
   if(act==='imp-forcar'){const r=S.imp&&S.imp.rows[+b.dataset.i];if(r){if(r.ignorar){r.ignorar=false;r.cat=r.cat||'Transferências e Pix';r.motivo='Você escolheu importar esta transferência'}else r.motivo='Você indicou que não é o mesmo lançamento';r.forcar=true;r.dup=false;r.conf='revisar';r.incluir=!!r.cat;r.dupDe=null}render();return}
   if(act==='rem-repetidos'){if(S.confirm!=='rep'){S.confirm='rep';render();return}S.confirm=null;const ids=new Set(repetidosExtrato().map(x=>x.l.id));S.lanc=S.lanc.filter(l=>!ids.has(l.id));mark('lancamentos');render();toast(`${ids.size} ${ids.size===1?'lançamento repetido removido':'lançamentos repetidos removidos'}.`);return}
+  if(act==='tema'){const ord=['escuro','claro','auto'],t=ord[(ord.indexOf(temaAtual())+1)%3];aplicarTema(t);if(S.config&&!S.ro){S.config.tema=t;mark('config')}b.textContent=rotuloTema();toast(t==='auto'?'Tema automático: segue o modo do aparelho.':`Tema ${t} aplicado${S.ro?' neste aparelho':' no celular e no computador'}.`);return}
   if(act==='imp-novo'){S.imp=null;S.impErro=null;render();return}
   if(act==='imp-todos'){const on=b.dataset.on==='1';S.imp.rows.forEach(r=>{if(!r.dup&&r.cat&&!r.ignorar)r.incluir=on});render();return}
   if(act==='imp-confirmar'){importarExtrato();return}
@@ -1078,6 +1082,12 @@ function repetidosExtrato(){const vistos=new Map(),extras=[];for(const l of S.la
 function avisoRepetidos(){if(S.ro)return '';const ex=repetidosExtrato();if(!ex.length)return '';const tot=ex.reduce((s,x)=>s+(+x.l.valor||0),0),conf=S.confirm==='rep';
   return `<div class="banner alerta" style="margin-bottom:12px"><p><b>${ex.length} ${ex.length===1?'lançamento repetido':'lançamentos repetidos'}</b> vindos de extratos importados (mesma data, mesmo valor e mesmo saldo da conta), somando ${R(tot)}. Removendo, fica só o primeiro de cada par.</p>
    <button class="btn ${conf?'danger':''}" data-act="rem-repetidos">${conf?`Confirmar: remover ${ex.length}`:'Remover repetidos'}</button>${conf?'<button class="btn ghost" data-act="cancel">Cancelar</button>':''}</div>`}
+function temaAtual(){try{return localStorage.getItem('financas-tema')||'escuro'}catch(e){return 'escuro'}}
+function rotuloTema(){return {escuro:'☾ Escuro',claro:'☀ Claro',auto:'◐ Automático'}[temaAtual()]||'☾ Escuro'}
+function aplicarTema(t){const h=document.documentElement;try{localStorage.setItem('financas-tema',t)}catch(e){}
+  if(t==='escuro')h.setAttribute('data-theme','dark');else if(t==='claro')h.setAttribute('data-theme','light');else h.removeAttribute('data-theme');
+  const d=t==='escuro'||(t==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches),m=document.getElementById('themeColor');if(m)m.setAttribute('content',d?'#151D1A':'#FFFFFF');
+  const bt=document.getElementById('btnTema');if(bt)bt.textContent=rotuloTema()}
 function vImport(){
   if(S.form!=='extrato')return '';
   if(S.impBusy)return '<div class="newform"><h3>Lendo o extrato…</h3><p class="hint" style="grid-column:1/-1">Isso leva alguns segundos. A leitura acontece no seu aparelho.</p></div>';
@@ -1206,7 +1216,9 @@ async function exportarExcel(btn){
     const nome=`financas-casa-${hoje()}.xlsx`,tipo='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',blob=new Blob([out],{type:tipo});
     let file=null;try{file=new File([blob],nome,{type:tipo})}catch(e){}
     const ios=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
-    if(ios&&file&&navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:nome})}catch(e){if(e&&e.name!=='AbortError')throw e}}
+    const salvar=window.claude&&window.claude.use?await window.claude.use('downloads').catch(()=>null):null;
+    if(salvar){try{const r=await salvar.save({filename:nome,data:blob});if(r&&r.status==='saved')toast(`Planilha “${nome}” baixada.`)}catch(e){if(!e||e.code!=='canceled')throw e}}
+    else if(ios&&file&&navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:nome})}catch(e){if(e&&e.name!=='AbortError')throw e}}
     else{const u=URL.createObjectURL(blob),el=document.createElement('a');el.href=u;el.download=nome;document.body.appendChild(el);el.click();setTimeout(()=>{URL.revokeObjectURL(u);el.remove()},1500);toast(`Planilha “${nome}” baixada.`)}
   }catch(e){toast(navigator.onLine?'Não foi possível gerar a planilha. Tente de novo.':'Sem internet: abra o app online uma vez para habilitar a exportação.')}
   btn.disabled=false;btn.textContent=txt;
