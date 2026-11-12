@@ -215,6 +215,8 @@ tr.pago td{color:var(--muted)}
 .imphead{display:flex;flex-wrap:wrap;gap:8px 20px;justify-content:space-between;align-items:start}
 .impstats{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;font-size:.86rem;color:var(--muted)}
 .impstats b{color:var(--fg)}
+.dupbox{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--surface)}.dupbox summary{cursor:pointer}
+.nadanovo{padding:18px;text-align:center;border:1px dashed var(--line);border-radius:8px;color:var(--muted)}
 .avisoneg{background:var(--neg-soft);border:1px solid var(--neg);border-radius:8px;padding:10px 12px;font-size:.86rem}
 .imptab .orig{font-size:.72rem;color:var(--muted);padding-left:7px}
 .imptab tr.off td{opacity:.5}
@@ -580,7 +582,7 @@ function vLanc(){
    <input type="search" id="fq" placeholder="Buscar descrição" value="${esc(S.q)}" aria-label="Buscar">
    <select id="fcat" aria-label="Filtrar categoria"><option value="">Todas as categorias</option>${cats().map(c=>`<option ${c.nome===S.fcat?'selected':''}>${esc(c.nome)}</option>`).join('')}</select>
    <label class="hint"><input type="checkbox" id="ftodos" ${S.todos?'checked':''}> todos os meses</label></div>
-  ${vImport()}
+  ${avisoRepetidos()}${vImport()}
   <div class="tablewrap"><table><thead><tr><th style="width:140px">Data</th><th>Descrição</th><th style="width:200px">Categoria</th><th class="n" style="width:130px">Valor (R$)</th><th style="width:60px">Pago</th><th style="width:40px"></th></tr></thead><tbody>
   ${rows.map(l=>{const t=catInfo(l.cat).tipo;return `<tr><td><input type="date" id="l-${l.id}-data" data-k="l" data-id="${l.id}" data-f="data" value="${esc(l.data)}"></td>
    <td><input id="l-${l.id}-desc" data-k="l" data-id="${l.id}" data-f="desc" value="${esc(l.desc)}" placeholder="Descrição"></td>
@@ -885,8 +887,10 @@ document.addEventListener('click',e=>{
   if(act==='exportar'){exportarExcel(b);return}
   if(act==='ver-semsub'){S.tab='lanc';S.fcat=b.dataset.c;S.fsemsub=true;S.todos=false;S.q='';render();window.scrollTo({top:0});return}
   if(act==='limpa-semsub'){S.fsemsub=false;render();return}
+  if(act==='imp-forcar'){const r=S.imp&&S.imp.rows[+b.dataset.i];if(r){if(r.ignorar){r.ignorar=false;r.cat=r.cat||'Transferências e Pix';r.motivo='Você escolheu importar esta transferência'}else r.motivo='Você indicou que não é o mesmo lançamento';r.forcar=true;r.dup=false;r.conf='revisar';r.incluir=!!r.cat;r.dupDe=null}render();return}
+  if(act==='rem-repetidos'){if(S.confirm!=='rep'){S.confirm='rep';render();return}S.confirm=null;const ids=new Set(repetidosExtrato().map(x=>x.l.id));S.lanc=S.lanc.filter(l=>!ids.has(l.id));mark('lancamentos');render();toast(`${ids.size} ${ids.size===1?'lançamento repetido removido':'lançamentos repetidos removidos'}.`);return}
   if(act==='imp-novo'){S.imp=null;S.impErro=null;render();return}
-  if(act==='imp-todos'){const on=b.dataset.on==='1';S.imp.rows.forEach(r=>{if(!r.dup&&r.cat)r.incluir=on});render();return}
+  if(act==='imp-todos'){const on=b.dataset.on==='1';S.imp.rows.forEach(r=>{if(!r.dup&&r.cat&&!r.ignorar)r.incluir=on});render();return}
   if(act==='imp-confirmar'){importarExtrato();return}
   if(act==='ir-orc'){S.tab='orc';render();window.scrollTo({top:0});return}
   if(act==='meta-cheque'){const bk=S.config.banco;if(!bk||bk.saldo>=0)return;const N=Math.max(1,Math.round(+S.config.chequeMeses||6));
@@ -931,7 +935,7 @@ document.addEventListener('change',e=>{
       if(n)toast(`Mesma categoria aplicada a mais ${n} ${n===1?'linha igual':'linhas iguais'}.`)}
     setTimeout(()=>render(),0);return}
   if(k==='bk'){S.config.banco=S.config.banco||{saldo:0,data:hoje(),limite:0};S.config.banco[f]=v;if(f==='saldo')S.config.banco.data=hoje();mark('config');setTimeout(()=>render(),0);return}
-  if(k==='l'){const l=S.lanc.find(x=>x.id===t.dataset.id);if(l){if(f==='cat'){const[c,s]=String(v).split(SEP);l.cat=c;l.sub=s||''}else l[f]=v;mark('lancamentos')}}
+  if(k==='l'){const l=S.lanc.find(x=>x.id===t.dataset.id);if(l){if(f==='cat'){const[c,s]=String(v).split(SEP);l.cat=c;l.sub=s||'';l.auto=false}else l[f]=v;mark('lancamentos')}}
   else if(k==='s'){const c=cats()[+t.dataset.i],s=c&&c.subs&&c.subs[+t.dataset.j];if(!s)return;
     if(f==='nome'){const nv=String(v).trim();if(!nv||c.subs.some(x=>x!==s&&x.nome===nv)){t.value=s.nome;return}
       S.lanc.forEach(l=>{if(l.cat===c.nome&&l.sub===s.nome)l.sub=nv});s.nome=nv;mark('lancamentos')}
@@ -996,28 +1000,48 @@ async function lerExtrato(file){
     if(!res.txs.length)throw new Error('vazio');
     const hist={};S.lanc.forEach(l=>{if(l.desc&&l.cat){const k=Extrato.norm(l.desc);hist[k]={cat:l.cat,sub:l.sub||''};hist['pix:'+k]=hist[k]}});
     const ctx={cats:cats(),nome:res.meta.nome||'',regras:S.config.regras||{},historico:hist,criaveis:Object.keys(CATS_AUTO)};
-    const ja=new Set(S.lanc.map(l=>l.ext).filter(Boolean));
+    // o que já está na planilha: (1) importado de extrato — mesma data, valor e saldo; (2) lançado à mão ou pago em Contas — mesmo valor, até 3 dias de diferença
+    const porId=new Map(),porChave=new Map();S.lanc.forEach(l=>{if(!l.ext)return;porId.set(l.ext,l);const k=Extrato.chaveDeExt(l.ext);if(k&&!porChave.has(k))porChave.set(k,l)});
+    const soltos=S.lanc.filter(l=>!l.ext),usados=new Set();
+    const dias=(a,b)=>Math.abs((new Date(a+'T12:00')-new Date(b+'T12:00'))/864e5);
     S.imp={meta:res.meta,arquivo:file.name,rows:res.txs.slice().sort((a,b)=>a.data.localeCompare(b.data)).map(tx=>{
-      const c=Extrato.classificar(tx,ctx),id=Extrato.idMov(tx),dup=ja.has(id);
-      return {tx,id,chave:Extrato.chave(tx),desc:Extrato.descricao(tx),cat:c.cat||'',sub:c.sub||'',conf:dup?'duplicado':c.conf,motivo:dup?'Este movimento já foi importado antes':c.motivo,ignorar:!!c.ignorar,dup,incluir:!dup&&!c.ignorar&&!!c.cat}})};
+      const c=Extrato.classificar(tx,ctx),id=Extrato.idMov(tx),k=Extrato.chaveMov(tx),desc=Extrato.descricao(tx);
+      let ex=porId.get(id)||(k&&porChave.get(k)),dupTipo=ex?'exato':null;
+      if(!ex&&!c.ignorar){const cand=soltos.filter(l=>!usados.has(l.id)&&Math.abs(Math.abs(+l.valor||0)-Math.abs(tx.valor))<0.005&&l.data&&dias(l.data,tx.data)<=3)
+        .sort((a,b)=>(b.cat===c.cat)-(a.cat===c.cat)||dias(a.data,tx.data)-dias(b.data,tx.data));
+        if(cand.length){ex=cand[0];usados.add(ex.id);dupTipo='provavel'}}
+      const corrigir=dupTipo==='exato'&&ex.ext!==id&&Extrato.norm(ex.desc)!==Extrato.norm(desc);
+      let novaCat=null;if(corrigir&&c.cat&&ex.auto!==false&&(ex.cat!==c.cat||(ex.sub||'')!==(c.sub||''))){
+        const foiAuto=ex.auto===true||['',tx.tipo,'Pix enviado','Debito visa electron brasil'].some(t=>{const a=Extrato.classificar({tipo:t,detalhe:ex.desc,valor:tx.valor},{...ctx,regras:{},historico:{}});return a.cat===ex.cat&&(a.sub||'')===(ex.sub||'')});
+        if(foiAuto)novaCat={cat:c.cat,sub:c.sub||''}}
+      return {tx,id,chave:Extrato.chave(tx),desc,cat:c.cat||'',sub:c.sub||'',conf:ex?'duplicado':c.conf,motivo:ex?'Já está na planilha':c.motivo,ignorar:!!c.ignorar,
+        dup:!!ex,dupTipo,dupDe:ex?{id:ex.id,desc:ex.desc,data:ex.data,cat:ex.cat,sub:ex.sub}:null,corrigir,novaCat,incluir:!ex&&!c.ignorar&&!!c.cat}})};
   }catch(e){S.impErro=e&&e.message==='vazio'?'Não encontrei movimentos neste arquivo. Confira se é o extrato da conta corrente (PDF, OFX ou CSV).'
     :(navigator.onLine?'Não consegui ler este arquivo. Tente o PDF baixado pelo app do banco ou exporte o extrato em OFX.':'Sem internet: abra o app online uma vez para habilitar a leitura de PDF.')}
   S.impBusy=false;render();
 }
 function importarExtrato(){
   const I=S.imp;if(!I)return;const sel=I.rows.filter(r=>r.incluir&&r.cat);
-  if(!sel.length){toast('Nenhuma linha marcada para importar.');return}
+  let corr=0;I.rows.filter(r=>r.corrigir&&r.dupDe).forEach(r=>{const l=S.lanc.find(x=>x.id===r.dupDe.id);if(l){l.desc=r.desc;l.ext=r.id;if(r.novaCat){garantirCategoria(r.novaCat.cat,r.novaCat.sub);l.cat=r.novaCat.cat;l.sub=r.novaCat.sub}corr++}});
+  if(!sel.length){const m=I.meta;let msg=corr?`${corr} ${corr===1?'descrição corrigida':'descrições corrigidas'}.`:'Nada novo para importar.';
+    if(m.saldoFinal!=null){const bk=S.config.banco||{};if(!bk.data||(m.fim||'')>=bk.data){S.config.banco={...bk,saldo:m.saldoFinal,data:m.fim||hoje(),conta:m.conta||bk.conta||'',agencia:m.agencia||bk.agencia||'',limite:+bk.limite||0};msg+=' Saldo da conta atualizado.'}}
+    S.imp=null;S.form=null;mark('config','lancamentos');render();toast(msg);return}
   S.config.regras=S.config.regras||{};
   for(const r of sel){garantirCategoria(r.cat,r.sub);const ci=catInfo(r.cat);
     // despesa: saída vira valor positivo (entrada na mesma categoria vira estorno); receita: o contrário
     const v=Math.round((ci.tipo==='despesa'?-r.tx.valor:r.tx.valor)*100)/100;
-    S.lanc.push({id:uid(),data:r.tx.data,desc:r.desc,cat:r.cat,sub:r.sub,valor:v,pago:true,ext:r.id});
+    S.lanc.push({id:uid(),data:r.tx.data,desc:r.desc,cat:r.cat,sub:r.sub,valor:v,pago:true,ext:r.id,auto:r.conf!=='manual'});
     S.config.regras[r.chave]={cat:r.cat,sub:r.sub}}
   const m=I.meta;
   if(m.saldoFinal!=null){const bk=S.config.banco||{};if(!bk.data||(m.fim||'')>=bk.data)S.config.banco={...bk,saldo:m.saldoFinal,data:m.fim||hoje(),conta:m.conta||bk.conta||'',agencia:m.agencia||bk.agencia||'',limite:+bk.limite||0}}
   S.mes=ym(sel.map(r=>r.tx.data).sort().pop());S.imp=null;S.form=null;mark('config','lancamentos');render();
-  toast(`${sel.length} lançamentos importados${m.saldoFinal!=null&&m.saldoFinal<0?'. Saldo negativo enviado ao painel do cheque especial.':'.'}`);
+  const nd=I.rows.filter(r=>r.dup).length;
+  toast(`${sel.length} lançamentos importados${nd?`, ${nd} já existentes ignorados`:''}${corr?`, ${corr} ${corr===1?'descrição corrigida':'descrições corrigidas'}`:''}${m.saldoFinal!=null&&m.saldoFinal<0?'. Saldo negativo enviado ao painel do cheque especial.':'.'}`);
 }
+function repetidosExtrato(){const vistos=new Map(),extras=[];for(const l of S.lanc){if(!l.ext)continue;const k=Extrato.chaveDeExt(l.ext);if(!k)continue;if(vistos.has(k))extras.push({l,orig:vistos.get(k)});else vistos.set(k,l)}return extras}
+function avisoRepetidos(){if(S.ro)return '';const ex=repetidosExtrato();if(!ex.length)return '';const tot=ex.reduce((s,x)=>s+(+x.l.valor||0),0),conf=S.confirm==='rep';
+  return `<div class="banner alerta" style="margin-bottom:12px"><p><b>${ex.length} ${ex.length===1?'lançamento repetido':'lançamentos repetidos'}</b> vindos de extratos importados (mesma data, mesmo valor e mesmo saldo da conta), somando ${R(tot)}. Removendo, fica só o primeiro de cada par.</p>
+   <button class="btn ${conf?'danger':''}" data-act="rem-repetidos">${conf?`Confirmar: remover ${ex.length}`:'Remover repetidos'}</button>${conf?'<button class="btn ghost" data-act="cancel">Cancelar</button>':''}</div>`}
 function vImport(){
   if(S.form!=='extrato')return '';
   if(S.impBusy)return '<div class="newform"><h3>Lendo o extrato…</h3><p class="hint" style="grid-column:1/-1">Isso leva alguns segundos. A leitura acontece no seu aparelho.</p></div>';
@@ -1026,32 +1050,41 @@ function vImport(){
      <b>Escolha o arquivo do extrato</b><span class="hint">PDF baixado do app do banco, OFX ou CSV. No computador, dá para arrastar o arquivo até aqui. O arquivo é lido no seu aparelho e não vai para nenhum servidor.</span></label>
     ${S.impErro?`<p class="erro">${esc(S.impErro)}</p>`:''}
     <div class="acts"><button class="btn ghost" data-act="form-fechar">Cancelar</button></div></div>`;
-  const I=S.imp,rows=I.rows,inc=rows.filter(r=>r.incluir&&r.cat);let ent=0,sai=0;inc.forEach(r=>{r.tx.valor>0?ent+=r.tx.valor:sai-=r.tx.valor});
-  const soma=rows.reduce((s,r)=>s+r.tx.valor,0),M=I.meta;
+  const I=S.imp,todas=I.rows,rows=todas.filter(r=>(!r.dup&&!r.ignorar)||r.forcar),dups=todas.filter(r=>r.dup&&!r.forcar),ign=todas.filter(r=>r.ignorar&&!r.dup&&!r.forcar),inc=rows.filter(r=>r.incluir&&r.cat);let ent=0,sai=0;inc.forEach(r=>{r.tx.valor>0?ent+=r.tx.valor:sai-=r.tx.valor});
+  const soma=todas.reduce((s,r)=>s+r.tx.valor,0),M=I.meta;
   const confere=M.saldoInicial!=null&&M.saldoFinal!=null?Math.abs(M.saldoInicial+soma-M.saldoFinal)<0.02:null;
   const nRev=inc.filter(r=>r.conf==='revisar').length;
   const CC={aprendida:['ok','aprendida'],sugerida:['neutro','sugerida'],revisar:['atencao','revisar'],manual:['ok','sua escolha'],transferencia:['neutro','transferência'],duplicado:['neutro','já importado']};
   const opts=r=>{const ex=cats().some(c=>c.nome===r.cat);let h=`<option value="" ${!r.cat?'selected':''}>— não importar —</option>`;
     if(r.cat&&!ex)h+=`<option value="${esc(r.cat+(r.sub?SEP+r.sub:''))}" selected>${esc(r.cat)}${r.sub?' › '+esc(r.sub):''} (nova)</option>`;
     return h+catOptions(ex?r.cat:'',ex?r.sub:'')};
-  const linhas=rows.map((r,i)=>{const cc=CC[r.conf]||CC.sugerida,neg=r.tx.valor<0;
+  const linhas=rows.map(r=>{const i=todas.indexOf(r),cc=CC[r.conf]||CC.sugerida,neg=r.tx.valor<0;
     const tipo=r.ignorar?['neutro','Transferência']:neg?['critico','Despesa']:['ok','Receita'];
     return `<tr class="${r.incluir?'':'off'} ${r.conf==='revisar'&&r.incluir?'rev':''}">
-     <td><input type="checkbox" id="imp-${i}-inc" data-k="imp" data-i="${i}" data-f="incluir" ${r.incluir?'checked':''} ${r.dup?'disabled':''} aria-label="Importar esta linha" style="width:auto"></td>
+     <td><input type="checkbox" id="imp-${i}-inc" data-k="imp" data-i="${i}" data-f="incluir" ${r.incluir?'checked':''} aria-label="Importar esta linha" style="width:auto"></td>
      <td>${fmtData(r.tx.data)}</td>
      <td><input id="imp-${i}-desc" data-k="imp" data-i="${i}" data-f="desc" value="${esc(r.desc)}" style="min-width:170px"><div class="orig">${esc(r.tx.tipo)}</div></td>
      <td class="n ${neg?'down':'up'}">${R(r.tx.valor)}</td>
      <td><span class="chip ${tipo[0]}">${tipo[1]}</span></td>
-     <td><select id="imp-${i}-cat" data-k="imp" data-i="${i}" data-f="cat" ${r.dup?'disabled':''} aria-label="Categoria">${opts(r)}</select></td>
+     <td><select id="imp-${i}-cat" data-k="imp" data-i="${i}" data-f="cat" aria-label="Categoria">${opts(r)}</select></td>
      <td><span class="chip ${cc[0]}" title="${esc(r.motivo)}">${cc[1]}</span></td></tr>`}).join('');
   return `<div class="impbox">
-   <div class="imphead"><div><h3>${esc(I.arquivo)}</h3><p class="hint">${M.agencia?'Agência '+esc(M.agencia)+' · ':''}${M.conta?'Conta '+esc(M.conta)+' · ':''}${M.inicio?fmtData(M.inicio)+' a ':''}${M.fim?fmtData(M.fim)+'/'+M.fim.slice(0,4):''} · ${rows.length} movimentos</p></div>
+   <div class="imphead"><div><h3>${esc(I.arquivo)}</h3><p class="hint">${M.agencia?'Agência '+esc(M.agencia)+' · ':''}${M.conta?'Conta '+esc(M.conta)+' · ':''}${M.inicio?fmtData(M.inicio)+' a ':''}${M.fim?fmtData(M.fim)+'/'+M.fim.slice(0,4):''} · ${todas.length} movimentos · <b>${rows.length} ${rows.length===1?'novo':'novos'}</b></p></div>
     <div class="impstats"><span>Entradas <b class="up">${R(ent)}</b></span><span>Saídas <b class="down">${R(sai)}</b></span>${M.saldoFinal!=null?`<span>Saldo final <b class="${M.saldoFinal<0?'down':''}">${R(M.saldoFinal)}</b></span>`:''}
      ${confere===true?'<span class="chip ok" title="Saldo inicial + movimentos = saldo final">conferido</span>':confere===false?'<span class="chip atencao" title="A soma dos movimentos não bate com o saldo final do extrato">soma não confere</span>':''}</div></div>
    ${M.saldoFinal!=null&&M.saldoFinal<0?`<p class="avisoneg"><b>Conta no cheque especial.</b> O saldo final é ${R(M.saldoFinal)}. Ao importar, esse saldo vai para o painel do cheque especial em Orçamento e entra como dívida em Patrimônio. Os juros e o IOF vão para Impostos e taxas, nas subcategorias “Juros do cheque especial” e “IOF”.</p>`:''}
    <p class="hint">Confira a categoria de cada linha. Saídas viram despesa e entradas viram receita automaticamente. Quando você troca a categoria de um item, as linhas iguais acompanham, e o app lembra da sua escolha nos próximos extratos.${nRev?` <b>${nRev} ${nRev===1?'linha precisa':'linhas precisam'} de revisão.</b>`:''}</p>
-   <div class="tablewrap"><table class="imptab"><thead><tr><th></th><th>Data</th><th>Descrição</th><th class="n">Valor</th><th>Tipo</th><th>Categoria</th><th>Classificação</th></tr></thead><tbody>${linhas}</tbody></table></div>
-   <div class="acts"><button class="btn primary" data-act="imp-confirmar">Importar ${inc.length} ${inc.length===1?'lançamento':'lançamentos'}</button>
+   ${dups.length?`<details class="dupbox"><summary><b>${dups.length} ${dups.length===1?'movimento já está':'movimentos já estão'} na planilha</b> e ${dups.length===1?'foi retirado':'foram retirados'} da importação para não duplicar${dups.some(r=>r.corrigir)?`. ${dups.filter(r=>r.corrigir).length} ${dups.filter(r=>r.corrigir).length===1?'tem a descrição':'têm a descrição'} corrigida ao concluir`:''}. Ver quais</summary>
+     <div class="tablewrap" style="margin-top:10px"><table><thead><tr><th>Data</th><th>No extrato</th><th class="n">Valor</th><th>Já lançado como</th><th></th></tr></thead><tbody>
+     ${dups.map(r=>{const i=todas.indexOf(r),d=r.dupDe;return `<tr><td>${fmtData(r.tx.data)}</td><td>${esc(r.desc)}</td><td class="n">${R(r.tx.valor)}</td>
+       <td>${esc(d.desc)} <span class="hint">· ${fmtData(d.data)} · ${esc(d.cat)}${d.sub?' › '+esc(d.sub):''}</span>${r.corrigir?` <span class="chip neutro">${r.novaCat?`será corrigido para ${esc(r.novaCat.cat)}${r.novaCat.sub?' › '+esc(r.novaCat.sub):''}`:'descrição será corrigida'}</span>`:''}</td>
+       <td>${r.dupTipo==='provavel'?`<button class="btn ghost mini" data-act="imp-forcar" data-i="${i}" title="Valor e data parecidos com um lançamento manual. Se for outro gasto, importe mesmo assim.">Não é o mesmo: importar</button>`:'<span class="chip neutro">idêntico</span>'}</td></tr>`}).join('')}
+     </tbody></table></div></details>`:''}
+   ${ign.length?`<details class="dupbox"><summary><b>${ign.length} ${ign.length===1?'transferência':'transferências'} entre contas suas</b> (Pix ou TED para você mesmo) ${ign.length===1?'ficou':'ficaram'} de fora, porque não ${ign.length===1?'é':'são'} receita nem despesa. Ver</summary>
+     <div class="tablewrap" style="margin-top:10px"><table><tbody>${ign.map(r=>`<tr><td>${fmtData(r.tx.data)}</td><td>${esc(r.desc)} <span class="hint">· ${esc(r.tx.tipo)}</span></td><td class="n">${R(r.tx.valor)}</td><td><button class="btn ghost mini" data-act="imp-forcar" data-i="${todas.indexOf(r)}">Importar mesmo assim</button></td></tr>`).join('')}</tbody></table></div></details>`:''}
+   ${rows.length?`<div class="tablewrap"><table class="imptab"><thead><tr><th></th><th>Data</th><th>Descrição</th><th class="n">Valor</th><th>Tipo</th><th>Categoria</th><th>Classificação</th></tr></thead><tbody>${linhas}</tbody></table></div>`
+     :`<p class="nadanovo">Nada novo neste extrato: ${dups.length===todas.length?`todos os ${todas.length} movimentos`:'todos os movimentos de receita e despesa'} já estão na planilha.</p>`}
+   <div class="acts"><button class="btn primary" data-act="imp-confirmar">${inc.length?`Importar ${inc.length} ${inc.length===1?'lançamento novo':'lançamentos novos'}`:(M.saldoFinal!=null?'Atualizar saldo e concluir':'Concluir')}</button>
     <button class="btn ghost mini" data-act="imp-todos" data-on="1">Marcar todos</button><button class="btn ghost mini" data-act="imp-todos" data-on="0">Desmarcar todos</button>
     <span class="sp"></span><button class="btn ghost" data-act="imp-novo">Outro arquivo</button><button class="btn ghost" data-act="form-fechar">Cancelar</button></div></div>`;
 }

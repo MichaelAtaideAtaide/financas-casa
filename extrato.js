@@ -16,7 +16,7 @@
     return out;
   }
   const semValores = l => l.replace(dataRe, '').replace(moneyRe, '').replace(/\s+/g, ' ').trim();
-  const RUIDO = /^(data\s+(descricao|historico|lancamento)|detalhe dos movimentos|extrato( de conta)?\b|(segunda|terca|quarta|quinta|sexta|sabado|domingo)(-feira)?\s*,|\d+\s*\/\s*\d+$|saldo (anterior|do dia|inicial|final|disponivel)\b|total\b|lancamentos futuros)/;
+  const RUIDO = /^(hoje|ontem)\b|^(data\s+(descricao|historico|lancamento)|detalhe dos movimentos|extrato( de conta)?\b|(segunda|terca|quarta|quinta|sexta|sabado|domingo)(-feira)?\s*,|\d+\s*\/\s*\d+$|saldo (anterior|do dia|inicial|final|disponivel)\b|total\b|lancamentos futuros)/;
 
   /* ---------- PDF → linhas de texto ---------- */
   async function pdfParaLinhas(buf) {
@@ -73,8 +73,15 @@
       } else pend.push(l);
     }
     const sobra = pend;
-    // quantas linhas de descrição vêm antes da data: aprende com o primeiro movimento
-    const k = blocos.length ? Math.min(blocos[0].antes.length, 2) : 0;
+    // quantas linhas de descrição vêm ANTES da data (tipo do movimento) e quantas DEPOIS (estabelecimento).
+    // Usa o padrão mais comum do extrato inteiro, para não errar se o topo tiver uma linha a mais.
+    let k = blocos.length ? Math.min(blocos[0].antes.length, 2) : 0;
+    if (blocos.length > 2) {
+      const cont = {}; blocos.slice(1).forEach(b => { cont[b.antes.length] = (cont[b.antes.length] || 0) + 1; });
+      const moda = +Object.keys(cont).sort((a, b) => cont[b] - cont[a])[0];
+      const depoisUlt = Math.min(sobra.length, 2);
+      k = Math.max(0, Math.min(2, moda - depoisUlt));
+    }
     const txs = blocos.map((b, i) => {
       const antes = b.antes.slice(Math.max(0, b.antes.length - k));
       const prox = i + 1 < blocos.length ? blocos[i + 1].antes : sobra;
@@ -121,7 +128,7 @@
     [/tarifa|cesta (de )?servico|pacote de servico|anuidade|manutencao (de )?conta|taxa (de )?(saque|manutencao)/, 'Impostos e taxas', 'Tarifas bancárias'],
     [/sao paulo transporte|sptrans|bilhete unico|\bmetro\b|cptm|\buber\b|\b99 ?(app|pop|taxi)?\b|cabify|posto|combust|shell|ipiranga|petrobras|\bbr mania|estac|estacionamento|\bpark\b|zona azul|sem parar|conectcar|veloe|pedagio/, 'Transporte', ''],
     [/carrefour|pao de acucar|\bextra\b|assai|atacadao|\bdia (supermercado|brasil)|supermerc|mercado(?! ?(livre|pago))|hortifruti|\boba\b|sonda|st marche|emporio|bio mundo|quitanda|acougue|sacolao|natural da terra|minuto pa|swift/, 'Mercado', ''],
-    [/restaurante|lanchon|lanchonete|picanharia|churrasc|pizza|burger|hamburg|mc ?donald|bk |subway|ifood|rappi|ze delivery|gelato|sorvet|\bcafe\b|coffee|padaria|panificadora|confeitaria|doceria|bistro|baoba|sushi|temaki|bar e|boteco|outback|madero|starbucks|cafeteria|coupcafe/, 'Restaurantes e delivery', ''],
+    [/restaurante|lanchon|lanchonete|picanharia|churrasc|pizza|burger|hamburg|mc ?donald|bk |subway|ifood|rappi|ze delivery|gelato|sorvet|\bcafe\b|coffee|padaria|panificadora|confeitaria|doceria|\bpaes\b|\bdoces\b|buffet|pizzaria|pizzas|bistro|baoba|sushi|temaki|bar e|boteco|outback|madero|starbucks|cafeteria|coupcafe/, 'Restaurantes e delivery', ''],
     [/drogasil|droga raia|drogaria|farmacia|pague menos|panvel|onofre|hospital|clinica|laboratorio|fleury|odonto|dentista|unimed|amil|bradesco saude|sulamerica/, 'Saúde', ''],
     [/\bsesc\b|cinema|cinemark|ingresso|teatro|show|museu|parque|clube|kinoplex|sympla|eventim/, 'Lazer', ''],
     [/netflix|spotify|disney|hbo|\bmax\b|prime video|amazon prime|youtube|deezer|globoplay|apple\.com|icloud|google (one|storage)|paramount|chatgpt|openai|claude|anthropic/, 'Assinaturas', ''],
@@ -158,6 +165,7 @@
       for (const [re, cat, sub] of REGRAS_RECEITA) if (re.test(n) && existe(cat)) return { cat, sub, conf: 'sugerida', motivo: 'Entrada identificada pela descrição' };
       return { cat: existe('Renda extra') && ehTransfer(n) ? 'Renda extra' : (existe('Outras receitas') ? 'Outras receitas' : ''), sub: '', conf: 'revisar', motivo: 'Entrada de dinheiro: confira a origem' };
     }
+    if (/nu pagamentos|pagamento (de )?fatura|pagto (de )?fatura|pag(amento|to)? cartao|fatura cartao/.test(n)) return { cat: existe('Outras despesas') ? 'Outras despesas' : '', sub: '', conf: 'revisar', motivo: 'Pode ser o pagamento da fatura do cartão. Se você já lança as compras na aba Cartões, desmarque esta linha para não contar duas vezes.' };
     for (const [re, cat, sub] of REGRAS) if (re.test(n)) {
       if (existe(cat) || ctx.criaveis.includes(cat)) return { cat, sub, conf: 'sugerida', motivo: 'Identificado pelo nome do estabelecimento' };
     }
@@ -167,5 +175,7 @@
   }
   function idMov(tx) { return 'ext-' + [tx.data, tx.valor.toFixed(2), norm(tx.tipo + '|' + (tx.detalhe || '')), tx.saldo == null ? (tx.fitid || '') : tx.saldo.toFixed(2)].join('|').replace(/[^a-z0-9|.,-]/g, '').slice(0, 120); }
 
-  window.Extrato = { lerArquivo, parseLinhas, parseOFX, pdfParaLinhas, classificar, chave, descricao, idMov, norm };
+  const chaveMov = tx => tx.saldo == null ? null : [tx.data, tx.valor.toFixed(2), tx.saldo.toFixed(2)].join('|');
+  function chaveDeExt(ext) { const p = String(ext || '').replace(/^ext-/, '').split('|'); if (p.length < 4 || !p[p.length - 1] || !/^\d{4}-\d{2}-\d{2}$/.test(p[0])) return null; return [p[0], p[1], p[p.length - 1]].join('|'); }
+  window.Extrato = { chaveMov, chaveDeExt, lerArquivo, parseLinhas, parseOFX, pdfParaLinhas, classificar, chave, descricao, idMov, norm };
 })();
