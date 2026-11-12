@@ -1,7 +1,7 @@
 /* Finanças da Casa — leitura de extratos (PDF, OFX, CSV/texto) e classificação automática.
    Tudo roda no aparelho: o arquivo do extrato não é enviado para nenhum servidor. */
 (function () {
-  const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+  const norm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
   // valores como "-R$ 1.100,00", "R$ 84,93", "-84,93", "1.234,56 D"
   const moneyRe = /(-)?\s*(?:R\s*\$\s*)?(-)?(\d{1,3}(?:\.\d{3})*,\d{2})(?!\d)(\s*[DC]\b)?/g;
   const dataRe = /^(\d{2})\/(\d{2})\/(\d{2,4})\b/;
